@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body { font-family: Arial, sans-serif; color: #222; }
+      .container { width: 720px; margin: 0 auto; }
+      .header { display: flex; justify-content: space-between; }
+      .section { margin-top: 24px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      th { background: #f5f5f5; }
+      .total { text-align: right; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <h2>Invoice</h2>
+          <div>Invoice #: {{invoice.invoice_number}}</div>
+          <div>Date: {{invoice.issue_date}}</div>
+        </div>
+        <div>
+          <div>{{sender.name}}</div>
+          <div>{{sender.address}}</div>
+          <div>{{sender.phone}}</div>
+          <div>{{sender.email}}</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h4>Bill To</h4>
+        <div>{{invoice.first_name}} {{invoice.last_name}}</div>
+        <div>{{invoice.email}}</div>
+        <div>{{invoice.company_name}}</div>
+        <div>{{invoice.company_address}}, {{invoice.company_city}}, {{invoice.company_country}}</div>
+        {{#if invoice.company_tax_id}}
+          <div>Tax ID: {{invoice.company_tax_id}}</div>
+        {{/if}}
+      </div>
+
+      <div class="section">
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each items}}
+              <tr>
+                <td>{{description}}</td>
+                <td>{{amount}}</td>
+              </tr>
+            {{/each}}
+            <tr>
+              <td class="total">Total</td>
+              <td class="total">{{invoice.total_amount}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

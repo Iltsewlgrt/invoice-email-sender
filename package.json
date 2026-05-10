@@ -1,0 +1,47 @@
+{
+  "name": "invoice-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "worker:pdf": "node dist/workers/pdfWorker.js",
+    "worker:email": "node dist/workers/emailWorker.js",
+    "start:workers": "concurrently \"npm run worker:pdf\" \"npm run worker:email\"",
+    "worker:pdf:dev": "ts-node-dev --respawn --transpile-only src/workers/pdfWorker.ts",
+    "worker:email:dev": "ts-node-dev --respawn --transpile-only src/workers/emailWorker.ts",
+    "start:workers:dev": "concurrently \"npm run worker:pdf:dev\" \"npm run worker:email:dev\""
+  },
+  "dependencies": {
+    "bullmq": "^5.8.4",
+    "dayjs": "^1.11.11",
+    "dotenv": "^16.4.5",
+    "env-var": "^7.4.1",
+    "express": "^4.19.2",
+    "handlebars": "^4.7.8",
+    "html-pdf-node": "^1.0.7",
+    "http-status-codes": "^2.3.0",
+    "ioredis": "^5.4.1",
+    "nodemailer": "^8.0.7",
+    "pg": "^8.12.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^14.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.12",
+    "@types/nodemailer": "^6.4.14",
+    "@types/pg": "^8.11.10",
+    "@types/swagger-ui-express": "^4.1.6",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/uuid": "^9.0.8",
+    "concurrently": "^8.2.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
+  }
+}

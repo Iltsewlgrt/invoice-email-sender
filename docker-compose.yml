@@ -1,0 +1,131 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "3000"
+      NODE_ENV: "production"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: invoice_user
+      DB_PASSWORD: invoice_pass
+      DB_NAME: invoices
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      SMTP_REQUIRE_TLS: "false"
+      SENDER_NAME: ${SENDER_NAME:-Invoice Sender}
+      SENDER_EMAIL: ${SENDER_EMAIL:-billing@example.com}
+      SENDER_ADDRESS: ${SENDER_ADDRESS:-}
+      SENDER_PHONE: ${SENDER_PHONE:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+
+  worker_pdf:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "dist/workers/pdfWorker.js"]
+    environment:
+      NODE_ENV: "production"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: invoice_user
+      DB_PASSWORD: invoice_pass
+      DB_NAME: invoices
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      SMTP_REQUIRE_TLS: "false"
+      SENDER_NAME: ${SENDER_NAME:-Invoice Sender}
+      SENDER_EMAIL: ${SENDER_EMAIL:-billing@example.com}
+      SENDER_ADDRESS: ${SENDER_ADDRESS:-}
+      SENDER_PHONE: ${SENDER_PHONE:-}
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+
+  worker_email:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "dist/workers/emailWorker.js"]
+    environment:
+      NODE_ENV: "production"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: invoice_user
+      DB_PASSWORD: invoice_pass
+      DB_NAME: invoices
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      SMTP_REQUIRE_TLS: "false"
+      SENDER_NAME: ${SENDER_NAME:-Invoice Sender}
+      SENDER_EMAIL: ${SENDER_EMAIL:-billing@example.com}
+      SENDER_ADDRESS: ${SENDER_ADDRESS:-}
+      SENDER_PHONE: ${SENDER_PHONE:-}
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: invoice_user
+      POSTGRES_PASSWORD: invoice_pass
+      POSTGRES_DB: invoices
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invoice_user -d invoices"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+volumes:
+  postgres_data:

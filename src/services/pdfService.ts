@@ -14,8 +14,16 @@ export async function generateInvoicePdf(invoiceId: number): Promise<string> {
 
   const items = await getInvoiceItems(invoiceId);
 
-  const templatePath = path.join(process.cwd(), "src", "templates", "invoice.hbs");
-  const templateSource = await fs.readFile(templatePath, "utf-8");
+  const distTemplatePath = path.join(process.cwd(), "dist", "templates", "invoice.hbs");
+  const srcTemplatePath = path.join(process.cwd(), "src", "templates", "invoice.hbs");
+  let templateSource: string;
+
+  // Prefer dist template in production builds, fallback to src for dev.
+  try {
+    templateSource = await fs.readFile(distTemplatePath, "utf-8");
+  } catch {
+    templateSource = await fs.readFile(srcTemplatePath, "utf-8");
+  }
   const template = handlebars.compile(templateSource);
 
   const html = template({
@@ -30,7 +38,7 @@ export async function generateInvoicePdf(invoiceId: number): Promise<string> {
   const dir = path.join(process.cwd(), "storage", "invoices");
   await fs.mkdir(dir, { recursive: true });
 
-  const filename = `${invoice.invoice_number}.pdf`;
+  const filename = `${invoice.invoiceNumber}.pdf`;
   const filePath = path.join(dir, filename);
 
   await fs.writeFile(filePath, pdfBuffer);

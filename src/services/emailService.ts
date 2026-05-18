@@ -9,25 +9,22 @@ export type EmailPayload = {
   attachmentPath: string;
 };
 
+const transportOptions: SMTPTransport.Options = {
+  host: config.mail.smtpHost,
+  port: config.mail.smtpPort,
+  secure: config.mail.smtpSecure,
+  requireTLS: config.mail.smtpRequireTls,
+  auth: config.mail.smtpUser
+    ? {
+      user: config.mail.smtpUser,
+      pass: config.mail.smtpPassword
+    }
+    : undefined
+};
+
+const transport = nodemailer.createTransport(transportOptions);
+
 export async function sendEmail(payload: EmailPayload): Promise<void> {
-  await sendWithSmtp(payload);
-}
-
-async function sendWithSmtp(payload: EmailPayload): Promise<void> {
-  const transportOptions: SMTPTransport.Options = {
-    host: config.mail.smtpHost,
-    port: config.mail.smtpPort,
-    secure: config.mail.smtpSecure,
-    requireTLS: config.mail.smtpRequireTls,
-    auth: config.mail.smtpUser
-      ? {
-          user: config.mail.smtpUser,
-          pass: config.mail.smtpPassword
-        }
-      : undefined
-  };
-
-  const transport = nodemailer.createTransport(transportOptions);
 
   await transport.sendMail({
     from: `${config.sender.name} <${config.sender.email}>`,

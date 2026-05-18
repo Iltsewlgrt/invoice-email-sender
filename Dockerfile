@@ -6,8 +6,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY tsconfig.json ./
+COPY prisma ./prisma
 COPY src ./src
 
+RUN npm run prisma:generate
 RUN npm run build
 
 
@@ -47,6 +49,8 @@ COPY --from=build /app/node_modules ./node_modules
 RUN npm prune --omit=dev
 
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/src/templates ./dist/templates
 
 # Runtime asset used by pdfService (reads from src/templates)
 COPY --from=build /app/src/templates ./src/templates

@@ -1,16 +1,23 @@
 import { Worker } from "bullmq";
+import { z } from "zod";
 import { connection, PDF_QUEUE, emailQueue } from "../queues";
 import { generateInvoicePdf } from "../services/pdfService";
 import { updateInvoicePdfPath } from "../repositories/invoicesRepository";
+import { prisma } from "../db";
+import { logger } from "../logger";
+
+const pdfJobSchema = z.object({
+  invoiceId: z.number().int().positive()
+});
 
 const worker = new Worker(
   PDF_QUEUE,
   async (job) => {
-    const { invoiceId } = job.data as { invoiceId: number };
+    const { invoiceId } = pdfJobSchema.parse(job.data);
 
     const pdfPath = await generateInvoicePdf(invoiceId);
 
-    await updateInvoicePdfPath(invoiceId, pdfPath);
+    await updateInvoicePdfPath(prisma, invoiceId, pdfPath);
 
     await emailQueue.add("send-email", { invoiceId });
   },
@@ -18,5 +25,5 @@ const worker = new Worker(
 );
 
 worker.on("failed", (job, err) => {
-  console.error("PDF worker failed", job?.id, err);
+  logger.error({ err, jobId: job?.id }, "PDF worker failed");
 });

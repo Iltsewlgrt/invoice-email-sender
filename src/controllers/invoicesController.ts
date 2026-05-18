@@ -1,9 +1,10 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
 import { createInvoiceRequest } from "../services/invoiceService";
-import { pdfQueue } from "../queues";
-import { ERR_CLIENT_NOT_FOUND } from "../constants/errors";
+import { ERR_INVALID_PAYLOAD } from "../constants/errors";
+import { AppError } from "../errors/appError";
+import { INVOICE_STATUS } from "../constants/invoiceStatus";
 
 const createInvoiceSchema = z.object({
   email: z.string().email(),
@@ -17,23 +18,25 @@ const createInvoiceSchema = z.object({
     .min(1)
 });
 
-export async function createInvoiceHandler(req: Request, res: Response): Promise<Response> {
-  const parseResult = createInvoiceSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ error: "Invalid payload", details: parseResult.error.format() });
-  }
-
+export async function createInvoiceHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<Response | void> {
   try {
-    const { invoiceId } = await createInvoiceRequest(parseResult.data);
-    await pdfQueue.add("generate-pdf", { invoiceId });
-    return res.status(StatusCodes.ACCEPTED).json({ invoiceId, status: "queued" });
-  } catch (error) {
-    if (error instanceof Error && error.message === ERR_CLIENT_NOT_FOUND) {
-      return res.status(StatusCodes.NOT_FOUND).json({ error: "Client not found" });
+    const parseResult = createInvoiceSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new AppError(
+        ERR_INVALID_PAYLOAD,
+        StatusCodes.BAD_REQUEST,
+        "Invalid payload",
+        parseResult.error.format()
+      );
     }
-    console.error(error);
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
+
+    const { invoiceId } = await createInvoiceRequest(parseResult.data);
+    return res.status(StatusCodes.ACCEPTED).json({ invoiceId, status: INVOICE_STATUS.QUEUED });
+  } catch (error) {
+    next(error);
   }
 }

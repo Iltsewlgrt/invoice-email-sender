@@ -1,21 +1,5 @@
-import { Pool, PoolClient, QueryResult, QueryResultRow } from "pg";
-import { config } from "./config";
+import { Prisma, PrismaClient } from "@prisma/client";
 
-const pool = new Pool({
-  host: config.db.host,
-  port: config.db.port,
-  user: config.db.user,
-  password: config.db.password,
-  database: config.db.database
-});
+export const prisma = new PrismaClient();
 
-export function query<T extends QueryResultRow>(
-  text: string,
-  params?: unknown[]
-): Promise<QueryResult<T>> {
-  return pool.query(text, params);
-}
-
-export async function getClient(): Promise<PoolClient> {
-  return pool.connect();
-}
+export type DbClient = PrismaClient | Prisma.TransactionClient;

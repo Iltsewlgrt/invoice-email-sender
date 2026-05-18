@@ -36,6 +36,4 @@ export const invoicesRouter = Router();
  *       404:
  *         description: Client not found
  */
-invoicesRouter.post("/", async (req, res) => {
-  await createInvoiceHandler(req, res);
-});
+invoicesRouter.post("/", createInvoiceHandler);

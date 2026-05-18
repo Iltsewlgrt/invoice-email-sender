@@ -48,9 +48,8 @@ This repo includes a `docker-compose.yml` that starts the full stack:
 docker compose up -d --build
 ```
 
-PostgreSQL schema is automatically applied on the first start (via `sql/schema.sql`).
-If you already have an existing `postgres_data` volume, the init script will not re-run.
-In that case you can either apply the schema manually or recreate the volume.
+Database schema is applied via Prisma migrations.
+The `migrate` service runs `prisma migrate deploy` before the app starts.
 
 ### Run locally (without Docker)
 
@@ -60,22 +59,22 @@ In that case you can either apply the schema manually or recreate the volume.
 docker compose up -d postgres redis mailhog
 ```
 
-2. Create tables
-
-```bash
-psql "postgresql://invoice_user:invoice_pass@localhost:5432/invoices" -f sql/schema.sql
-```
-
-3. Install deps
+2. Install deps
 
 ```bash
 npm install
 ```
 
-4. Configure env
+3. Configure env
 
 ```bash
 copy .env.example .env
+```
+
+4. Apply migrations
+
+```bash
+npm run migrate:deploy
 ```
 
 5. Run API
@@ -90,7 +89,7 @@ npm run dev
 npm run start:workers
 ```
 
-Swagger UI is available at http://localhost:3000/docs
+Swagger UI is available at http://localhost:3000/docs (only in non-production).
 Mailhog UI is available at http://localhost:8025
 
 ## Example request
@@ -111,6 +110,19 @@ curl -X POST http://localhost:3000/invoices \
 
 - For local tests, keep Mailhog running and set `SMTP_HOST=localhost`, `SMTP_PORT=1025`.
 - For Moosend (or any SMTP provider), fill `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` from the provider dashboard.
+- In production, `SMTP_HOST`, `SMTP_PORT`, `SENDER_NAME`, and `SENDER_EMAIL` are required.
+
+## Lint
+
+```bash
+npm run lint
+```
+
+## Tests
+
+```bash
+npm test
+```
 
 ## Suggested seed data
 

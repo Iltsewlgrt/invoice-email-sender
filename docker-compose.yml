@@ -6,11 +6,7 @@ services:
     environment:
       PORT: "3000"
       NODE_ENV: "production"
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_USER: invoice_user
-      DB_PASSWORD: invoice_pass
-      DB_NAME: invoices
+      DATABASE_URL: postgresql://invoice_user:invoice_pass@postgres:5432/invoices?schema=public
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       SMTP_HOST: mailhog
@@ -26,6 +22,8 @@ services:
     volumes:
       - ./storage:/app/storage
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -40,11 +38,7 @@ services:
     command: ["node", "dist/workers/pdfWorker.js"]
     environment:
       NODE_ENV: "production"
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_USER: invoice_user
-      DB_PASSWORD: invoice_pass
-      DB_NAME: invoices
+      DATABASE_URL: postgresql://invoice_user:invoice_pass@postgres:5432/invoices?schema=public
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       SMTP_HOST: mailhog
@@ -58,6 +52,8 @@ services:
     volumes:
       - ./storage:/app/storage
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -72,11 +68,7 @@ services:
     command: ["node", "dist/workers/emailWorker.js"]
     environment:
       NODE_ENV: "production"
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_USER: invoice_user
-      DB_PASSWORD: invoice_pass
-      DB_NAME: invoices
+      DATABASE_URL: postgresql://invoice_user:invoice_pass@postgres:5432/invoices?schema=public
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       SMTP_HOST: mailhog
@@ -90,12 +82,26 @@ services:
     volumes:
       - ./storage:/app/storage
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       mailhog:
         condition: service_started
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["npm", "run", "migrate:deploy"]
+    environment:
+      NODE_ENV: "production"
+      DATABASE_URL: postgresql://invoice_user:invoice_pass@postgres:5432/invoices?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:16
@@ -107,7 +113,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U invoice_user -d invoices"]
       interval: 5s

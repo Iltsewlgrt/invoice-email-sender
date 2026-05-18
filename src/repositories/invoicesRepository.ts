@@ -1,5 +1,7 @@
-import { PoolClient } from "pg";
-import { query } from "../db";
+import dayjs from "dayjs";
+import type { Prisma } from "@prisma/client";
+import { DbClient, prisma } from "../db";
+import { INVOICE_STATUS, InvoiceStatus } from "../constants/invoiceStatus";
 
 export type InvoiceItemInput = {
   description: string;
@@ -7,17 +9,17 @@ export type InvoiceItemInput = {
 };
 
 export type InvoiceDetailsRow = {
-  invoice_number: string;
-  issue_date: string;
-  total_amount: string;
-  first_name: string;
-  last_name: string;
+  invoiceNumber: string;
+  issueDate: string;
+  totalAmount: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  company_name: string;
-  company_address: string;
-  company_city: string;
-  company_country: string;
-  company_tax_id: string | null;
+  companyName: string;
+  companyAddress: string;
+  companyCity: string;
+  companyCountry: string;
+  companyTaxId: string | null;
 };
 
 export type InvoiceItemRow = {
@@ -26,111 +28,163 @@ export type InvoiceItemRow = {
 };
 
 export type InvoiceEmailRow = {
-  pdf_path: string | null;
-  invoice_number: string;
+  pdfPath: string | null;
+  invoiceNumber: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
 };
 
+type InvoiceItemAmount = { toString: () => string };
+
 export async function insertInvoiceRequest(
-  client: PoolClient,
+  client: DbClient,
   requestId: string,
   email: string,
-  payload: unknown
+  payload: Prisma.InputJsonValue
 ): Promise<void> {
-  await client.query(
-    "INSERT INTO invoice_requests (id, email, payload) VALUES ($1, $2, $3)",
-    [requestId, email, payload]
-  );
+  await client.invoiceRequest.create({
+    data: {
+      id: requestId,
+      email,
+      payload
+    }
+  });
 }
 
 export async function createInvoice(
-  client: PoolClient,
+  client: DbClient,
   requestId: string,
   clientId: number,
   companyId: number,
   issueDate: string,
   totalAmount: number
 ): Promise<number> {
-  const invoiceResult = await client.query<{ id: number }>(
-    `INSERT INTO invoices (request_id, client_id, company_id, issue_date, total_amount)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id`,
-    [requestId, clientId, companyId, issueDate, totalAmount]
-  );
+  const invoice = await client.invoice.create({
+    data: {
+      requestId,
+      clientId,
+      companyId,
+      issueDate: new Date(issueDate),
+      totalAmount
+    },
+    select: { id: true }
+  });
 
-  return invoiceResult.rows[0].id;
+  return invoice.id;
 }
 
 export async function updateInvoiceNumber(
-  client: PoolClient,
+  client: DbClient,
   invoiceId: number,
   invoiceNumber: string
 ): Promise<void> {
-  await client.query("UPDATE invoices SET invoice_number = $1 WHERE id = $2", [
-    invoiceNumber,
-    invoiceId
-  ]);
+  await client.invoice.update({
+    where: { id: invoiceId },
+    data: { invoiceNumber }
+  });
 }
 
 export async function insertInvoiceItem(
-  client: PoolClient,
+  client: DbClient,
   invoiceId: number,
   item: InvoiceItemInput
 ): Promise<void> {
-  await client.query(
-    "INSERT INTO invoice_items (invoice_id, description, amount) VALUES ($1, $2, $3)",
-    [invoiceId, item.description, item.amount]
-  );
+  await client.invoiceItem.create({
+    data: {
+      invoiceId,
+      description: item.description,
+      amount: item.amount
+    }
+  });
 }
 
 export async function getInvoiceDetails(invoiceId: number): Promise<InvoiceDetailsRow | null> {
-  const invoice = await query<InvoiceDetailsRow>(
-    `SELECT i.invoice_number, i.issue_date, i.total_amount,
-            c.first_name, c.last_name, c.email,
-            co.name as company_name, co.address as company_address,
-            co.city as company_city, co.country as company_country,
-            co.tax_id as company_tax_id
-     FROM invoices i
-     JOIN clients c ON c.id = i.client_id
-     JOIN companies co ON co.id = i.company_id
-     WHERE i.id = $1`,
-    [invoiceId]
-  );
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    include: {
+      client: true,
+      company: true
+    }
+  });
 
-  return invoice.rows[0] ?? null;
+  if (!invoice) {
+    return null;
+  }
+
+  return {
+    invoiceNumber: invoice.invoiceNumber ?? "",
+    issueDate: dayjs(invoice.issueDate).format("YYYY-MM-DD"),
+    totalAmount: invoice.totalAmount.toString(),
+    firstName: invoice.client.firstName,
+    lastName: invoice.client.lastName,
+    email: invoice.client.email,
+    companyName: invoice.company.name,
+    companyAddress: invoice.company.address,
+    companyCity: invoice.company.city,
+    companyCountry: invoice.company.country,
+    companyTaxId: invoice.company.taxId
+  };
 }
 
 export async function getInvoiceItems(invoiceId: number): Promise<InvoiceItemRow[]> {
-  const items = await query<InvoiceItemRow>(
-    "SELECT description, amount FROM invoice_items WHERE invoice_id = $1",
-    [invoiceId]
-  );
+  const items: Array<{ description: string; amount: InvoiceItemAmount }> =
+    await prisma.invoiceItem.findMany({
+      where: { invoiceId },
+      select: {
+        description: true,
+        amount: true
+      }
+    });
 
-  return items.rows;
+  return items.map((item) => ({
+    description: item.description,
+    amount: item.amount.toString()
+  }));
 }
 
-export async function updateInvoicePdfPath(invoiceId: number, pdfPath: string): Promise<void> {
-  await query("UPDATE invoices SET pdf_path = $1, status = $2 WHERE id = $3", [
-    pdfPath,
-    "pdf_generated",
-    invoiceId
-  ]);
+export async function updateInvoicePdfPath(
+  client: DbClient,
+  invoiceId: number,
+  pdfPath: string
+): Promise<void> {
+  await client.invoice.update({
+    where: { id: invoiceId },
+    data: {
+      pdfPath,
+      status: INVOICE_STATUS.PDF_GENERATED
+    }
+  });
 }
 
-export async function updateInvoiceStatus(invoiceId: number, status: string): Promise<void> {
-  await query("UPDATE invoices SET status = $1 WHERE id = $2", [status, invoiceId]);
+export async function updateInvoiceStatus(
+  client: DbClient,
+  invoiceId: number,
+  status: InvoiceStatus
+): Promise<void> {
+  await client.invoice.update({
+    where: { id: invoiceId },
+    data: { status }
+  });
 }
 
 export async function getInvoiceEmailInfo(invoiceId: number): Promise<InvoiceEmailRow | null> {
-  const result = await query<InvoiceEmailRow>(
-    `SELECT i.pdf_path, i.invoice_number, c.email, c.first_name, c.last_name
-     FROM invoices i
-     JOIN clients c ON c.id = i.client_id
-     WHERE i.id = $1`,
-    [invoiceId]
-  );
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    include: {
+      client: true
+    }
+  });
 
-  return result.rows[0] ?? null;
+  if (!invoice) {
+    return null;
+  }
+
+  return {
+    pdfPath: invoice.pdfPath,
+    invoiceNumber: invoice.invoiceNumber ?? "",
+    email: invoice.client.email,
+    firstName: invoice.client.firstName,
+    lastName: invoice.client.lastName
+  };
 }

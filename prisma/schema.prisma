@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id       Int     @id @default(autoincrement())
+  name     String
+  address  String
+  city     String
+  country  String
+  taxId    String? @map("tax_id")
+
+  clients  Client[]
+  invoices Invoice[]
+
+  @@map("companies")
+}
+
+model Client {
+  id        Int     @id @default(autoincrement())
+  email     String  @unique
+  firstName String  @map("first_name")
+  lastName  String  @map("last_name")
+  companyId Int     @map("company_id")
+
+  company  Company @relation(fields: [companyId], references: [id])
+  invoices Invoice[]
+
+  @@map("clients")
+}
+
+model InvoiceRequest {
+  id        String   @id @db.Uuid
+  email     String
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  invoices Invoice[]
+
+  @@map("invoice_requests")
+}
+
+model Invoice {
+  id            Int       @id @default(autoincrement())
+  requestId     String    @db.Uuid @map("request_id")
+  clientId      Int       @map("client_id")
+  companyId     Int       @map("company_id")
+  invoiceNumber String?   @map("invoice_number")
+  issueDate     DateTime  @db.Date @map("issue_date")
+  totalAmount   Decimal   @db.Decimal(12, 2) @map("total_amount")
+  status        String    @default("pending")
+  pdfPath       String?   @map("pdf_path")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  request InvoiceRequest @relation(fields: [requestId], references: [id])
+  client  Client         @relation(fields: [clientId], references: [id])
+  company Company        @relation(fields: [companyId], references: [id])
+  items   InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id        Int     @id @default(autoincrement())
+  invoiceId Int     @map("invoice_id")
+  description String
+  amount     Decimal @db.Decimal(12, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}

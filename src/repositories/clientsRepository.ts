@@ -1,20 +1,34 @@
-import { PoolClient } from "pg";
+import { DbClient } from "../db";
 
 export type ClientRow = {
   id: number;
-  first_name: string;
-  last_name: string;
-  company_id: number;
+  firstName: string;
+  lastName: string;
+  companyId: number;
 };
 
 export async function findClientByEmail(
-  client: PoolClient,
+  client: DbClient,
   email: string
 ): Promise<ClientRow | null> {
-  const result = await client.query<ClientRow>(
-    "SELECT id, first_name, last_name, company_id FROM clients WHERE email = $1",
-    [email]
-  );
+  const result = await client.client.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      companyId: true
+    }
+  });
 
-  return result.rows[0] ?? null;
+  if (!result) {
+    return null;
+  }
+
+  return {
+    id: result.id,
+    firstName: result.firstName,
+    lastName: result.lastName,
+    companyId: result.companyId
+  };
 }
